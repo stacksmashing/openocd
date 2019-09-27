@@ -142,6 +142,9 @@ m4_define([LIBFTDI_ADAPTERS],
 m4_define([LIBJAYLINK_ADAPTERS],
 	[[[jlink], [SEGGER J-Link Programmer], [JLINK]]])
 
+m4_define([BONOBO_ADAPTERS],
+	[[[bonobo], [LambdaConcept Bonobo Cable], [BONOBO]]])
+
 
 AC_ARG_ENABLE([doxygen-html],
   AS_HELP_STRING([--disable-doxygen-html],
@@ -237,7 +240,8 @@ AC_ARG_ADAPTERS([
   HIDAPI_ADAPTERS,
   HIDAPI_USB1_ADAPTERS,
   LIBFTDI_ADAPTERS,
-  LIBJAYLINK_ADAPTERS
+  LIBJAYLINK_ADAPTERS,
+  BONOBO_ADAPTERS
   ],[auto])
 
 AC_ARG_ENABLE([parport],
@@ -339,6 +343,10 @@ AC_ARG_ENABLE([internal-libjaylink],
 AC_ARG_ENABLE([target64],
   AS_HELP_STRING([--disable-target64], [Disable 64-bit target address]),
     [build_target64=$enableval], [build_target64=yes])
+
+AC_ARG_ENABLE([bonobo],
+  AS_HELP_STRING([--enable-bonobo], [Enable building support for the LambdaConcept Bonobo]),
+    [build_bonobo=$enableval], [build_bonobo=no])
 
 build_minidriver=no
 AC_MSG_CHECKING([whether to enable ZY1000 minidriver])
@@ -586,6 +594,12 @@ AS_IF([test "x$build_target64" = "xyes"], [
   AC_DEFINE([BUILD_TARGET64], [0], [0 if you don't want 64-bit addresses.])
 ])
 
+AS_IF([test "x$build_bonobo" = "xyes"], [
+  AC_DEFINE([BUILD_BONOBO], [1], [1 if you want the Bonobo driver.])
+], [
+  AC_DEFINE([BUILD_BONOBO], [0], [0 if you don't want the Bonobo driver.])
+])
+
 
 PKG_CHECK_MODULES([LIBUSB1], [libusb-1.0], [
 	use_libusb1=yes
@@ -710,6 +724,7 @@ AM_CONDITIONAL([USE_LIBFTDI], [test "x$use_libftdi" = "xyes"])
 AM_CONDITIONAL([USE_HIDAPI], [test "x$use_hidapi" = "xyes"])
 AM_CONDITIONAL([USE_LIBJAYLINK], [test "x$use_libjaylink" = "xyes"])
 AM_CONDITIONAL([TARGET64], [test "x$build_target64" = "xyes"])
+AM_CONDITIONAL([BONOBO], [test "x$build_bonobo" = "xyes"])
 
 AM_CONDITIONAL([MINIDRIVER], [test "x$build_minidriver" = "xyes"])
 AM_CONDITIONAL([MINIDRIVER_DUMMY], [test "x$build_minidriver_dummy" = "xyes"])
@@ -778,7 +793,7 @@ echo OpenOCD configuration summary
 echo --------------------------------------------------
 m4_foreach([adapter], [USB1_ADAPTERS, USB_ADAPTERS, USB0_ADAPTERS,
 	HIDAPI_ADAPTERS, HIDAPI_USB1_ADAPTERS, LIBFTDI_ADAPTERS,
-	LIBJAYLINK_ADAPTERS],
+	LIBJAYLINK_ADAPTERS, BONOBO_ADAPTERS],
 	[s=m4_format(["%-40s"], ADAPTER_DESC([adapter]))
 	AS_CASE([$ADAPTER_VAR([adapter])],
 		[auto], [
