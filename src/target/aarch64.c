@@ -1,6 +1,8 @@
 /***************************************************************************
  *   Copyright (C) 2015 by David Ung                                       *
  *                                                                         *
+ *   Copyright (C) 2019 Siguza                                             *
+ *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
  *   the Free Software Foundation; either version 2 of the License, or     *
@@ -127,6 +129,7 @@ static int aarch64_restore_system_control_reg(struct target *target)
  *  - read or write memory in phys or virt address */
 static int aarch64_mmu_modify(struct target *target, int enable)
 {
+	enum arm_mode target_mode = ARM_MODE_ANY;
 	struct aarch64_common *aarch64 = target_to_aarch64(target);
 	struct armv8_common *armv8 = &aarch64->armv8_common;
 	int retval = ERROR_OK;
@@ -155,6 +158,8 @@ static int aarch64_mmu_modify(struct target *target, int enable)
 
 	switch (armv8->arm.core_mode) {
 	case ARMV8_64_EL0T:
+		target_mode = ARMV8_64_EL1H;
+		/* fall through */
 	case ARMV8_64_EL1T:
 	case ARMV8_64_EL1H:
 		instr = ARMV8_MSR_GP(SYSTEM_SCTLR_EL1, 0);
@@ -180,9 +185,17 @@ static int aarch64_mmu_modify(struct target *target, int enable)
 		LOG_DEBUG("unknown cpu state 0x%" PRIx32, armv8->arm.core_mode);
 		break;
 	}
+	if (target_mode != ARM_MODE_ANY)
+		armv8_dpm_modeswitch(&armv8->dpm, target_mode);
 
 	retval = armv8->dpm.instr_write_data_r0(&armv8->dpm, instr,
 				aarch64->system_control_reg_curr);
+	if (retval != ERROR_OK)
+		return retval;
+
+	if (target_mode != ARM_MODE_ANY)
+		armv8_dpm_modeswitch(&armv8->dpm, ARM_MODE_ANY);
+
 	return retval;
 }
 
