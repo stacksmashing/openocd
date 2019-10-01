@@ -1,5 +1,7 @@
 /***************************************************************************
- *    Copyright (C) 2009 by David Brownell                                 *
+ *   Copyright (C) 2009 by David Brownell                                  *
+ *                                                                         *
+ *   Copyright (C) 2019 Siguza                                             *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -104,7 +106,7 @@ struct armv7a_common {
 
 	/* Core Debug Unit */
 	struct arm_dpm dpm;
-	uint32_t debug_base;
+	uint64_t debug_base;
 	struct adiv5_ap *debug_ap;
 	/* mdir */
 	uint8_t multi_processor_system;

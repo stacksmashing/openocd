@@ -7,6 +7,8 @@
  *                                                                         *
  *   revised:  4/25/13 by brent@mbari.org [DCC target request support]	   *
  *                                                                         *
+ *   Copyright (C) 2019 Siguza                                             *
+ *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
  *   the Free Software Foundation; either version 2 of the License, or     *
@@ -408,9 +410,11 @@ static int adapter_debug_entry(struct target *target)
 	int retval;
 
 	/* preserve the DCRDR across halts */
-	retval = target_read_u32(target, DCB_DCRDR, &target->savedDCRDR);
+	uint32_t tmp;
+	retval = target_read_u32(target, DCB_DCRDR, &tmp);
 	if (retval != ERROR_OK)
 		return retval;
+	target->savedDCRDR = tmp;
 
 	retval = armv7m->examine_debug_reason(target);
 	if (retval != ERROR_OK)
@@ -656,7 +660,7 @@ static int adapter_resume(struct target *target, int current,
 	armv7m_restore_context(target);
 
 	/* restore savedDCRDR */
-	res = target_write_u32(target, DCB_DCRDR, target->savedDCRDR);
+	res = target_write_u32(target, DCB_DCRDR, (uint32_t)target->savedDCRDR);
 	if (res != ERROR_OK)
 		return res;
 
@@ -739,7 +743,7 @@ static int adapter_step(struct target *target, int current,
 	armv7m_restore_context(target);
 
 	/* restore savedDCRDR */
-	res = target_write_u32(target, DCB_DCRDR, target->savedDCRDR);
+	res = target_write_u32(target, DCB_DCRDR, (uint32_t)target->savedDCRDR);
 	if (res != ERROR_OK)
 		return res;
 

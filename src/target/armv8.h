@@ -1,6 +1,8 @@
 /***************************************************************************
  *   Copyright (C) 2015 by David Ung                                       *
  *                                                                         *
+ *   Copyright (C) 2019 Siguza                                             *
+ *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
  *   the Free Software Foundation; either version 2 of the License, or     *
@@ -196,7 +198,7 @@ struct armv8_common {
 
 	/* Core Debug Unit */
 	struct arm_dpm dpm;
-	uint32_t debug_base;
+	uint64_t debug_base;
 	struct adiv5_ap *debug_ap;
 
 	const uint32_t *opcodes;

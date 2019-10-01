@@ -23,6 +23,8 @@
  *   Copyright (C) 2011 Andreas Fritiofson                                 *
  *   andreas.fritiofson@gmail.com                                          *
  *                                                                         *
+ *   Copyright (C) 2019 Siguza                                             *
+ *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
  *   the Free Software Foundation; either version 2 of the License, or     *
@@ -4889,13 +4891,13 @@ no_params:
 				e = Jim_GetOpt_Wide(goi, &w);
 				if (e != JIM_OK)
 					return e;
-				target->dbgbase = (uint32_t)w;
+				target->dbgbase = (uint64_t)w;
 				target->dbgbase_set = true;
 			} else {
 				if (goi->argc != 0)
 					goto no_params;
 			}
-			Jim_SetResult(goi->interp, Jim_NewIntObj(goi->interp, target->dbgbase));
+			Jim_SetResult(goi->interp, Jim_NewWideObj(goi->interp, target->dbgbase));
 			/* loop for more */
 			break;
 		case TCFG_RTOS:

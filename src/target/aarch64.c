@@ -252,7 +252,7 @@ static int aarch64_init_debug_access(struct target *target)
 
 /* Write to memory mapped registers directly with no cache or mmu handling */
 static int aarch64_dap_write_memap_register_u32(struct target *target,
-	uint32_t address,
+	uint64_t address,
 	uint32_t value)
 {
 	int retval;
@@ -2240,11 +2240,17 @@ static int aarch64_examine_first(struct target *target)
 	uint32_t tmp0, tmp1, tmp2, tmp3;
 	debug = ttypr = cpuid = 0;
 
-	/* Search for the APB-AB - it is needed for access to debug registers */
-	retval = dap_find_ap(swjdp, AP_TYPE_APB_AP, &armv8->debug_ap);
-	if (retval != ERROR_OK) {
-		LOG_ERROR("Could not find APB-AP for debug access");
-		return retval;
+	pc = (struct aarch64_private_config *)target->private_config;
+
+	if (pc->adiv5_config.ap_num == DP_APSEL_INVALID) {
+		/* Search for the APB-AP - it is needed for access to debug registers */
+		retval = dap_find_ap(swjdp, AP_TYPE_APB_AP, &armv8->debug_ap);
+		if (retval != ERROR_OK) {
+			LOG_ERROR("Could not find APB-AP for debug access");
+			return retval;
+		}
+	} else {
+		armv8->debug_ap = dap_ap(swjdp, pc->adiv5_config.ap_num);
 	}
 
 	retval = mem_ap_init(armv8->debug_ap);
@@ -2256,7 +2262,7 @@ static int aarch64_examine_first(struct target *target)
 	armv8->debug_ap->memaccess_tck = 10;
 
 	if (!target->dbgbase_set) {
-		uint32_t dbgbase;
+		uint64_t dbgbase;
 		/* Get ROM Table base */
 		uint32_t apid;
 		int32_t coreidx = target->coreid;
@@ -2268,7 +2274,7 @@ static int aarch64_examine_first(struct target *target)
 				&armv8->debug_base, &coreidx);
 		if (retval != ERROR_OK)
 			return retval;
-		LOG_DEBUG("Detected core %" PRId32 " dbgbase: %08" PRIx32
+		LOG_DEBUG("Detected core %" PRId32 " dbgbase: %016" PRIx64
 				" apid: %08" PRIx32, coreidx, armv8->debug_base, apid);
 	} else
 		armv8->debug_base = target->dbgbase;
@@ -2322,7 +2328,6 @@ static int aarch64_examine_first(struct target *target)
 	if (target->private_config == NULL)
 		return ERROR_FAIL;
 
-	pc = (struct aarch64_private_config *)target->private_config;
 	if (pc->cti == NULL)
 		return ERROR_FAIL;
 
@@ -2477,6 +2482,7 @@ static int aarch64_jim_configure(struct target *target, Jim_GetOptInfo *goi)
 			pc = calloc(1, sizeof(struct aarch64_private_config));
 			target->private_config = pc;
 	}
+	pc->adiv5_config.ap_num = DP_APSEL_INVALID;
 
 	/*
 	 * Call adiv5_jim_configure() to parse the common DAP options

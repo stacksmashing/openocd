@@ -1,6 +1,8 @@
 /***************************************************************************
  *   Copyright (C) 2016 by Matthias Welwarsky                              *
  *                                                                         *
+ *   Copyright (C) 2019 Siguza                                             *
+ *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
  *   the Free Software Foundation; either version 2 of the License, or     *
@@ -427,7 +429,7 @@ static int cti_configure(Jim_GetOptInfo *goi, struct arm_cti_object *cti)
 			e = Jim_GetOpt_Wide(goi, &w);
 			if (e != JIM_OK)
 				return e;
-			cti->cti.base = (uint32_t)w;
+			cti->cti.base = (target_addr_t)w;
 			/* loop for more */
 			break;
 
@@ -585,4 +587,3 @@ int cti_register_commands(struct command_context *cmd_ctx)
 {
 	return register_commands(cmd_ctx, NULL, cti_command_handlers);
 }
-

@@ -1,6 +1,8 @@
 /*
  * Copyright (C) 2009 by David Brownell
  *
+ * Copyright (C) 2019 Siguza
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -430,8 +432,8 @@ static int dpmv8_bpwp_enable(struct arm_dpm *dpm, unsigned index_t,
 	target_addr_t addr, uint32_t control)
 {
 	struct armv8_common *armv8 = dpm->arm->arch_info;
-	uint32_t vr = armv8->debug_base;
-	uint32_t cr = armv8->debug_base;
+	uint64_t vr = armv8->debug_base;
+	uint64_t cr = armv8->debug_base;
 	int retval;
 
 	switch (index_t) {
@@ -463,7 +465,7 @@ static int dpmv8_bpwp_enable(struct arm_dpm *dpm, unsigned index_t,
 static int dpmv8_bpwp_disable(struct arm_dpm *dpm, unsigned index_t)
 {
 	struct armv8_common *armv8 = dpm->arm->arch_info;
-	uint32_t cr;
+	uint64_t cr;
 
 	switch (index_t) {
 		case 0 ... 15:

@@ -23,6 +23,8 @@
  *   Copyright (C) 2013 Kamal Dasu                                         *
  *   kdasu.kdev@gmail.com                                                  *
  *                                                                         *
+ *   Copyright (C) 2019 Siguza                                             *
+ *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
  *   the Free Software Foundation; either version 2 of the License, or     *
@@ -2617,16 +2619,21 @@ static int cortex_a_examine_first(struct target *target)
 	struct cortex_a_common *cortex_a = target_to_cortex_a(target);
 	struct armv7a_common *armv7a = &cortex_a->armv7a_common;
 	struct adiv5_dap *swjdp = armv7a->arm.dap;
+	struct adiv5_private_config *pc = (struct adiv5_private_config *)target->private_config;
 
 	int i;
 	int retval = ERROR_OK;
 	uint32_t didr, cpuid, dbg_osreg;
 
-	/* Search for the APB-AP - it is needed for access to debug registers */
-	retval = dap_find_ap(swjdp, AP_TYPE_APB_AP, &armv7a->debug_ap);
-	if (retval != ERROR_OK) {
-		LOG_ERROR("Could not find APB-AP for debug access");
-		return retval;
+	if (pc->ap_num == DP_APSEL_INVALID) {
+		/* Search for the APB-AP - it is needed for access to debug registers */
+		retval = dap_find_ap(swjdp, AP_TYPE_APB_AP, &armv7a->debug_ap);
+		if (retval != ERROR_OK) {
+			LOG_ERROR("Could not find APB-AP for debug access");
+			return retval;
+		}
+	} else {
+		armv7a->debug_ap = dap_ap(swjdp, pc->ap_num);
 	}
 
 	retval = mem_ap_init(armv7a->debug_ap);
@@ -2638,7 +2645,7 @@ static int cortex_a_examine_first(struct target *target)
 	armv7a->debug_ap->memaccess_tck = 80;
 
 	if (!target->dbgbase_set) {
-		uint32_t dbgbase;
+		uint64_t dbgbase;
 		/* Get ROM Table base */
 		uint32_t apid;
 		int32_t coreidx = target->coreid;
@@ -2655,7 +2662,7 @@ static int cortex_a_examine_first(struct target *target)
 				  target->cmd_name);
 			return retval;
 		}
-		LOG_DEBUG("Detected core %" PRId32 " dbgbase: %08" PRIx32,
+		LOG_DEBUG("Detected core %" PRId32 " dbgbase: %016" PRIx64,
 			  target->coreid, armv7a->debug_base);
 	} else
 		armv7a->debug_base = target->dbgbase;

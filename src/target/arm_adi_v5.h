@@ -5,6 +5,8 @@
  *   Copyright (C) 2008 by Spencer Oliver                                  *
  *   spen@spen-soft.co.uk                                                  *
  *                                                                         *
+ *   Copyright (C) 2019 Siguza                                             *
+ *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
  *   the Free Software Foundation; either version 2 of the License, or     *
@@ -141,6 +143,12 @@
 #define CSW_APB_DEFAULT         (CSW_DBGSWENABLE)
 
 
+/* Fields of the MEM-AP's CFG register */
+#define CFG_BIG_ENDIAN          (1UL << 0)
+#define CFG_LONG_ADDRESS        (1UL << 1)
+#define CFG_LARGE_DATA          (1UL << 2)
+
+
 /* Fields of the MEM-AP's IDR register */
 #define IDR_REV     (0xFUL << 28)
 #define IDR_JEP106  (0x7FFUL << 17)
@@ -190,7 +198,7 @@ struct adiv5_ap {
 	 * configure the address being read or written
 	 * "-1" indicates no cached value.
 	 */
-	uint32_t tar_value;
+	uint64_t tar_value;
 
 	/**
 	 * Configures how many extra tck clocks are added after starting a
@@ -209,6 +217,9 @@ struct adiv5_ap {
 
 	/* true if tar_value is in sync with TAR register */
 	bool tar_valid;
+
+	/* true if the Large Physical Address Extension is supported by the MEM-AP */
+	bool long_addr;
 };
 
 
@@ -486,27 +497,27 @@ static inline int dap_dp_poll_register(struct adiv5_dap *dap, unsigned reg,
 
 /* Queued MEM-AP memory mapped single word transfers. */
 int mem_ap_read_u32(struct adiv5_ap *ap,
-		uint32_t address, uint32_t *value);
+		uint64_t address, uint32_t *value);
 int mem_ap_write_u32(struct adiv5_ap *ap,
-		uint32_t address, uint32_t value);
+		uint64_t address, uint32_t value);
 
 /* Synchronous MEM-AP memory mapped single word transfers. */
 int mem_ap_read_atomic_u32(struct adiv5_ap *ap,
-		uint32_t address, uint32_t *value);
+		uint64_t address, uint32_t *value);
 int mem_ap_write_atomic_u32(struct adiv5_ap *ap,
-		uint32_t address, uint32_t value);
+		uint64_t address, uint32_t value);
 
 /* Synchronous MEM-AP memory mapped bus block transfers. */
 int mem_ap_read_buf(struct adiv5_ap *ap,
-		uint8_t *buffer, uint32_t size, uint32_t count, uint32_t address);
+		uint8_t *buffer, uint32_t size, uint64_t count, uint64_t address);
 int mem_ap_write_buf(struct adiv5_ap *ap,
-		const uint8_t *buffer, uint32_t size, uint32_t count, uint32_t address);
+		const uint8_t *buffer, uint32_t size, uint64_t count, uint64_t address);
 
 /* Synchronous, non-incrementing buffer functions for accessing fifos. */
 int mem_ap_read_buf_noincr(struct adiv5_ap *ap,
-		uint8_t *buffer, uint32_t size, uint32_t count, uint32_t address);
+		uint8_t *buffer, uint32_t size, uint64_t count, uint64_t address);
 int mem_ap_write_buf_noincr(struct adiv5_ap *ap,
-		const uint8_t *buffer, uint32_t size, uint32_t count, uint32_t address);
+		const uint8_t *buffer, uint32_t size, uint64_t count, uint64_t address);
 
 /* Initialisation of the debug system, power domains and registers */
 int dap_dp_init(struct adiv5_dap *dap);
@@ -517,7 +528,7 @@ void dap_invalidate_cache(struct adiv5_dap *dap);
 
 /* Probe the AP for ROM Table location */
 int dap_get_debugbase(struct adiv5_ap *ap,
-			uint32_t *dbgbase, uint32_t *apid);
+			uint64_t *dbgbase, uint32_t *apid);
 
 /* Probe Access Ports to find a particular type */
 int dap_find_ap(struct adiv5_dap *dap,
@@ -531,7 +542,7 @@ static inline struct adiv5_ap *dap_ap(struct adiv5_dap *dap, uint8_t ap_num)
 
 /* Lookup CoreSight component */
 int dap_lookup_cs_component(struct adiv5_ap *ap,
-			uint32_t dbgbase, uint8_t type, uint32_t *addr, int32_t *idx);
+			uint64_t dbgbase, uint8_t type, uint64_t *addr, int32_t *idx);
 
 struct target;
 
@@ -560,5 +571,7 @@ struct adiv5_private_config {
 
 extern int adiv5_verify_config(struct adiv5_private_config *pc);
 extern int adiv5_jim_configure(struct target *target, Jim_GetOptInfo *goi);
+
+#define ERROR_MEMAP_BAD_ADDR        (-1601)
 
 #endif /* OPENOCD_TARGET_ARM_ADI_V5_H */
