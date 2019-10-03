@@ -2479,10 +2479,10 @@ static int aarch64_jim_configure(struct target *target, Jim_GetOptInfo *goi)
 
 	pc = (struct aarch64_private_config *)target->private_config;
 	if (pc == NULL) {
-			pc = calloc(1, sizeof(struct aarch64_private_config));
-			target->private_config = pc;
+		pc = calloc(1, sizeof(struct aarch64_private_config));
+		pc->adiv5_config.ap_num = DP_APSEL_INVALID;
+		target->private_config = pc;
 	}
-	pc->adiv5_config.ap_num = DP_APSEL_INVALID;
 
 	/*
 	 * Call adiv5_jim_configure() to parse the common DAP options
