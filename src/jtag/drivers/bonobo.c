@@ -247,8 +247,8 @@ static int bonobo_initialize(void)
 	/* Set SWD clock */
 
 	buf[0] = CMD_SWD_FREQ;
-	buf[1] = 4; // T High
-	buf[2] = 7; // T Low
+	buf[1] = 6; // T High
+	buf[2] = 25; // T Low
 
 	ret = jtag_libusb_bulk_write(g_sess->usb_handle, BULK_EP_OUT,
 			(char *)buf, 3, BULK_EP_TIMEOUT);
