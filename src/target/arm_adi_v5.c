@@ -138,33 +138,30 @@ static int mem_ap_setup_tar(struct adiv5_ap *ap, uint64_t tar)
 
 static int mem_ap_read_tar(struct adiv5_ap *ap, uint64_t *tarp)
 {
+	int retval = ERROR_OK;
 	uint64_t tar = 0;
-	uint32_t tmp;
+	uint32_t lo = 0, hi = 0;
 
-	int retval = dap_queue_ap_read(ap, MEM_AP_REG_TAR, &tmp);
+	ap->tar_valid = false;
+
+	retval = dap_queue_ap_read(ap, MEM_AP_REG_TAR, &lo);
 	if (retval != ERROR_OK) {
-		ap->tar_valid = false;
 		return retval;
 	}
 
-	tar |= (uint64_t)tmp;
-
 	if (ap->long_addr) {
-		retval = dap_queue_ap_read(ap, MEM_AP_REG_TAR64, &tmp);
+		retval = dap_queue_ap_read(ap, MEM_AP_REG_TAR64, &hi);
 		if (retval != ERROR_OK) {
-			ap->tar_valid = false;
 			return retval;
 		}
-
-		tar |= (uint64_t)tmp << 32;
 	}
 
 	retval = dap_run(ap->dap);
 	if (retval != ERROR_OK) {
-		ap->tar_valid = false;
 		return retval;
 	}
 
+	tar = (uint64_t)lo | ((uint64_t)hi << 32);
 	*tarp = tar;
 	ap->tar_value = tar;
 	ap->tar_valid = true;
