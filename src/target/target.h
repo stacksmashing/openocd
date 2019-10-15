@@ -65,6 +65,7 @@ enum target_state {
 	TARGET_HALTED = 2,
 	TARGET_RESET = 3,
 	TARGET_DEBUG_RUNNING = 4,
+	TARGET_POWEROFF = 5,
 };
 
 enum nvp_assert {

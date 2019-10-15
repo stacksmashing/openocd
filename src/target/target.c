@@ -242,6 +242,7 @@ static const Jim_Nvp nvp_target_state[] = {
 	{ .name = "halted",  .value = TARGET_HALTED },
 	{ .name = "reset",   .value = TARGET_RESET },
 	{ .name = "debug-running", .value = TARGET_DEBUG_RUNNING },
+	{ .name = "poweroff", .value = TARGET_POWEROFF },
 	{ .name = NULL, .value = -1 },
 };
 

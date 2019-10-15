@@ -307,6 +307,11 @@ static int aarch64_check_state_one(struct target *target,
 	return ERROR_OK;
 }
 
+static inline int aarch64_check_powered(struct target *target, int *p_result)
+{
+	return aarch64_check_state_one(target, PRSR_PU, PRSR_PU, p_result, NULL);
+}
+
 static int aarch64_wait_halt_one(struct target *target)
 {
 	int retval = ERROR_OK;
@@ -527,6 +532,17 @@ static int aarch64_poll(struct target *target)
 	enum target_state prev_target_state;
 	int retval = ERROR_OK;
 	int halted;
+	int powered;
+
+	retval = aarch64_check_powered(target, &powered);
+	if (retval != ERROR_OK)
+		return retval;
+
+	if (!powered) {
+		/* Target is not powered, cannot check halted status */
+		target->state = TARGET_POWEROFF;
+		return ERROR_OK;
+	}
 
 	retval = aarch64_check_state_one(target,
 				PRSR_HALT, PRSR_HALT, &halted, NULL);
@@ -2246,6 +2262,7 @@ static int aarch64_examine_first(struct target *target)
 	struct aarch64_private_config *pc;
 	int i;
 	int retval = ERROR_OK;
+	int powered;
 	uint64_t debug, ttypr;
 	uint32_t cpuid;
 	uint32_t tmp0, tmp1, tmp2, tmp3;
@@ -2350,6 +2367,19 @@ static int aarch64_examine_first(struct target *target)
 		return ERROR_FAIL;
 
 	armv8->cti = pc->cti;
+
+	retval = aarch64_check_powered(target, &powered);
+	if (retval != ERROR_OK) {
+		LOG_DEBUG("Examine %s failed", "Processor Debug Status Register");
+		return retval;
+	}
+
+	if (!powered) {
+		LOG_ERROR("%s powered down!", target_name(target));
+		target->state = TARGET_POWEROFF; /* TARGET_NO_POWER? */
+		target->debug_reason = DBG_REASON_UNDEFINED;
+		return ERROR_OK;
+	}
 
 	retval = aarch64_dpm_setup(aarch64, debug);
 	if (retval != ERROR_OK)
