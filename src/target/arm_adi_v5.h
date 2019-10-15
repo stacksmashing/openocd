@@ -108,6 +108,7 @@
 #define CSW_8BIT		0
 #define CSW_16BIT		1
 #define CSW_32BIT		2
+#define CSW_64BIT		3
 #define CSW_ADDRINC_MASK    (3UL << 4)
 #define CSW_ADDRINC_OFF     0UL
 #define CSW_ADDRINC_SINGLE  (1UL << 4)
@@ -220,6 +221,9 @@ struct adiv5_ap {
 
 	/* true if the Large Physical Address Extension is supported by the MEM-AP */
 	bool long_addr;
+
+	/* true if the Large Data Extension is supported by the MEM-AP */
+	bool large_data;
 };
 
 
