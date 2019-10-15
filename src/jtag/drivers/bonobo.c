@@ -92,7 +92,62 @@ struct queue_s {
 	uint8_t cmd;
 	uint32_t data_w;
 	uint32_t *data_r;
+	uint32_t data_rlog;
+	uint8_t ack;
 };
+
+static inline const char* debug_reg_name(int cmd)
+{
+	char *reg_name = "UNK";
+	int addr = (cmd & SWD_CMD_A32) >> 3;
+
+	if (cmd & SWD_CMD_APnDP) {
+		switch(addr) {
+		case 0:
+			reg_name = "AP_O";
+			break;
+		case 1:
+			reg_name = "AP_4";
+			break;
+		case 2:
+			reg_name = "AP_8";
+			break;
+		case 3:
+			reg_name = "AP_C";
+			break;
+		}
+	} else {
+		switch(addr) {
+		case 0:
+			if (cmd & SWD_CMD_RnW)
+				reg_name = "DPIDR";
+			else
+				reg_name = "ABORT";
+			break;
+		case 1:
+			reg_name = "CTRL/STAT";
+			break;
+		case 2:
+			reg_name = "SELECT";
+			break;
+		case 3:
+			reg_name = "RDBUFF";
+			break;
+		}
+	}
+
+	return reg_name;
+}
+
+static inline void debug_queue(struct queue_s *q)
+{
+	LOG_DEBUG_IO("%5s %2s %10s 0x%08x %5s",
+		(q->cmd & SWD_CMD_RnW) ? "READ" : "WRITE",
+		(q->cmd & SWD_CMD_APnDP) ? "AP" : "DP",
+		debug_reg_name(q->cmd),
+		(q->cmd & SWD_CMD_RnW) ? q->data_rlog : q->data_w,
+		(q->ack == SWD_ACK_OK) ? "OK" : (q->ack == SWD_ACK_WAIT) ? "WAIT" : (q->ack == SWD_ACK_FAULT) ? "FAULT" : "JUNK");
+}
 
 struct bonobo_s {
 	struct jtag_libusb_device_handle *usb_handle;
@@ -573,8 +628,6 @@ static int bonobo_swd_run(void)
 	int will_write;
 	uint8_t *buffer;
 
-	LOG_DEBUG_IO("Executing %d queued transactions", g_sess->queue_len);
-
 	if (g_sess->queue_len <= 0) {
 		return ERROR_OK;
 	}
@@ -633,7 +686,6 @@ static int bonobo_swd_run(void)
 
 		queue_next = i;
 
-		LOG_DEBUG_IO("Write: %d, Read: %d", write_count, read_count);
 		assert(write_count <= BULK_TRANSFER_SIZE);
 		assert(read_count <= BULK_TRANSFER_SIZE);
 
@@ -669,6 +721,7 @@ static int bonobo_swd_run(void)
 			cmd = g_sess->queue[i].cmd;
 			ack = buffer[read_index++] & SWDCORE_ACK_MASK;
 			ack = ((ack & 1) << 2) | ((ack & 2)) | ((ack & 4) >> 2); /* Reverse bit order */
+			g_sess->queue[i].ack = ack;
 
 			if (ack != SWD_ACK_OK) {
 				LOG_DEBUG("SWD ack not OK: %d %s", i,
@@ -678,13 +731,15 @@ static int bonobo_swd_run(void)
 
 			if (cmd & SWD_CMD_RnW) {
 				data = le_to_h_u32(&buffer[read_index]);
-				LOG_DEBUG_IO("Read result: %"PRIx32, data);
 
+				g_sess->queue[i].data_rlog = data;
 				if (g_sess->queue[i].data_r) {
 					*g_sess->queue[i].data_r = data;
 				}
 				read_index += 4;
 			}
+
+			debug_queue(&g_sess->queue[i]);
 		}
 
 		if (ret != ERROR_OK) {
