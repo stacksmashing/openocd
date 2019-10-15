@@ -201,6 +201,9 @@ struct armv8_common {
 	uint64_t debug_base;
 	struct adiv5_ap *debug_ap;
 
+	uint64_t utt_base;
+	struct adiv5_ap *mem_ap;
+
 	const uint32_t *opcodes;
 
 	/* mdir */
@@ -281,6 +284,11 @@ static inline bool is_armv8(struct armv8_common *armv8)
 #define CPUV8_DBG_OSLAR		0x300
 
 #define CPUV8_DBG_AUTHSTATUS	0xFB8
+
+/* registers offsets from armv8.utt_base */
+#define UTT_DBGWRAP_REG_OFFSET	0
+#define UTT_DBGWRAP_DBGHALT		(1ULL << 31)
+#define UTT_DBGWRAP_DBGACK		(1ULL << 28)
 
 #define PAGE_SIZE_4KB				0x1000
 #define PAGE_SIZE_4KB_LEVEL0_BITS	39

@@ -48,6 +48,8 @@ enum halt_mode {
 struct aarch64_private_config {
 	struct adiv5_private_config adiv5_config;
 	struct arm_cti *cti;
+	uint64_t utt_base;
+	uint32_t mem_ap_num;
 };
 
 static int aarch64_poll(struct target *target);
@@ -385,10 +387,19 @@ static int aarch64_halt_one(struct target *target, enum halt_mode mode)
 	if (retval != ERROR_OK)
 		return retval;
 
-	/* trigger an event on channel 0, this outputs a halt request to the PE */
-	retval = arm_cti_pulse_channel(armv8->cti, 0);
-	if (retval != ERROR_OK)
-		return retval;
+	if (armv8->mem_ap && armv8->utt_base) {
+		/* Halt via UTT */
+		uint64_t dbgwrap = UTT_DBGWRAP_DBGHALT;
+		retval = mem_ap_write_buf(armv8->mem_ap, (uint8_t*)&dbgwrap,
+				sizeof(uint64_t), 1, armv8->utt_base + UTT_DBGWRAP_REG_OFFSET);
+		if (retval != ERROR_OK)
+			return retval;
+	} else {
+		/* trigger an event on channel 0, this outputs a halt request to the PE */
+		retval = arm_cti_pulse_channel(armv8->cti, 0);
+		if (retval != ERROR_OK)
+			return retval;
+	}
 
 	if (mode == HALT_SYNC) {
 		retval = aarch64_wait_halt_one(target);
@@ -2279,6 +2290,13 @@ static int aarch64_examine_first(struct target *target)
 	} else
 		armv8->debug_base = target->dbgbase;
 
+	if (pc->mem_ap_num && pc->utt_base) {
+		armv8->mem_ap = dap_ap(swjdp, pc->mem_ap_num);
+		armv8->utt_base = pc->utt_base;
+		LOG_DEBUG("uttbase: %016" PRIx64 ", mem-ap %d", pc->utt_base, pc->mem_ap_num);
+	} else
+		LOG_ERROR("%s: missing UTT configuration, halt may not work", target_name(target));
+
 	retval = mem_ap_write_atomic_u32(armv8->debug_ap,
 			armv8->debug_base + CPUV8_DBG_OSLAR, 0);
 	if (retval != ERROR_OK) {
@@ -2464,10 +2482,14 @@ static int aarch64_virt2phys(struct target *target, target_addr_t virt,
  */
 enum aarch64_cfg_param {
 	CFG_CTI,
+	CFG_UTTBASE,
+	CFG_MEM_AP_NUM,
 };
 
 static const Jim_Nvp nvp_config_opts[] = {
 	{ .name = "-cti", .value = CFG_CTI },
+	{ .name = "-uttbase", .value = CFG_UTTBASE },
+	{ .name = "-mem-ap-num", .value = CFG_MEM_AP_NUM },
 	{ .name = NULL, .value = -1 }
 };
 
@@ -2475,6 +2497,7 @@ static int aarch64_jim_configure(struct target *target, Jim_GetOptInfo *goi)
 {
 	struct aarch64_private_config *pc;
 	Jim_Nvp *n;
+	jim_wide w;
 	int e;
 
 	pc = (struct aarch64_private_config *)target->private_config;
@@ -2539,6 +2562,23 @@ static int aarch64_jim_configure(struct target *target, Jim_GetOptInfo *goi)
 			}
 			break;
 		}
+		case CFG_UTTBASE:
+			e = Jim_GetOpt_Wide(goi, &w);
+			if (e != JIM_OK)
+				return e;
+			pc->utt_base = (uint64_t)w;
+			break;
+
+		case CFG_MEM_AP_NUM:
+			e = Jim_GetOpt_Wide(goi, &w);
+			if (e != JIM_OK)
+				return e;
+			if (w < 0 || w > DP_APSEL_MAX) {
+				Jim_SetResultString(goi->interp, "-mem-ap-num is invalid", -1);
+				return JIM_ERR;
+			}
+			pc->mem_ap_num = (uint32_t)w;
+			break;
 
 		default:
 			return JIM_CONTINUE;
