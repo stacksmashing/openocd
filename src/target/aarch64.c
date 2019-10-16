@@ -45,11 +45,17 @@ enum halt_mode {
 	HALT_SYNC,
 };
 
+struct apple_utt {
+	uint32_t ap_num;
+	uint64_t base;
+	uint32_t width;
+	bool valid;
+};
+
 struct aarch64_private_config {
 	struct adiv5_private_config adiv5_config;
 	struct arm_cti *cti;
-	uint64_t utt_base;
-	uint32_t mem_ap_num;
+	struct apple_utt utt_config;
 };
 
 static int aarch64_poll(struct target *target);
@@ -392,11 +398,19 @@ static int aarch64_halt_one(struct target *target, enum halt_mode mode)
 	if (retval != ERROR_OK)
 		return retval;
 
-	if (armv8->mem_ap && armv8->utt_base) {
+	if (armv8->utt_ap) {
 		/* Halt via UTT */
-		uint64_t dbgwrap = UTT_DBGWRAP_DBGHALT;
-		retval = mem_ap_write_buf(armv8->mem_ap, (uint8_t*)&dbgwrap,
-				sizeof(uint64_t), 1, armv8->utt_base + UTT_DBGWRAP_REG_OFFSET);
+		if (armv8->utt_width == 64) {
+			uint64_t dbgwrap = UTT_DBGWRAP_DBGHALT;
+			retval = mem_ap_write_buf(armv8->utt_ap, (uint8_t*)&dbgwrap,
+					sizeof(uint64_t), 1, armv8->utt_base + UTT_DBGWRAP_REG_OFFSET);
+		} else if (armv8->utt_width == 32) {
+			retval = mem_ap_write_atomic_u32(armv8->utt_ap,
+					armv8->utt_base + UTT_DBGWRAP_REG_OFFSET, UTT_DBGWRAP_DBGHALT);
+		} else {
+			LOG_ERROR("Wrong UTT width (%d) for target %s", armv8->utt_width, target_name(target));
+			return ERROR_TARGET_UNALIGNED_ACCESS;
+		}
 		if (retval != ERROR_OK)
 			return retval;
 	} else {
@@ -2307,10 +2321,13 @@ static int aarch64_examine_first(struct target *target)
 	} else
 		armv8->debug_base = target->dbgbase;
 
-	if (pc->mem_ap_num && pc->utt_base) {
-		armv8->mem_ap = dap_ap(swjdp, pc->mem_ap_num);
-		armv8->utt_base = pc->utt_base;
-		LOG_DEBUG("uttbase: %016" PRIx64 ", mem-ap %d", pc->utt_base, pc->mem_ap_num);
+	if (pc->utt_config.valid) {
+		armv8->utt_ap = dap_ap(swjdp, pc->utt_config.ap_num);
+		armv8->utt_base = pc->utt_config.base;
+		armv8->utt_width = pc->utt_config.width;
+
+		LOG_DEBUG("utt: ap %d, base: %016" PRIx64 ", width %d",
+				pc->utt_config.ap_num, pc->utt_config.base, pc->utt_config.width);
 	} else
 		LOG_ERROR("%s: missing UTT configuration, halt may not work", target_name(target));
 
@@ -2512,14 +2529,12 @@ static int aarch64_virt2phys(struct target *target, target_addr_t virt,
  */
 enum aarch64_cfg_param {
 	CFG_CTI,
-	CFG_UTTBASE,
-	CFG_MEM_AP_NUM,
+	CFG_APPLE_UTT,
 };
 
 static const Jim_Nvp nvp_config_opts[] = {
 	{ .name = "-cti", .value = CFG_CTI },
-	{ .name = "-uttbase", .value = CFG_UTTBASE },
-	{ .name = "-mem-ap-num", .value = CFG_MEM_AP_NUM },
+	{ .name = "-apple-utt", .value = CFG_APPLE_UTT },
 	{ .name = NULL, .value = -1 }
 };
 
@@ -2592,22 +2607,32 @@ static int aarch64_jim_configure(struct target *target, Jim_GetOptInfo *goi)
 			}
 			break;
 		}
-		case CFG_UTTBASE:
-			e = Jim_GetOpt_Wide(goi, &w);
-			if (e != JIM_OK)
-				return e;
-			pc->utt_base = (uint64_t)w;
-			break;
+		case CFG_APPLE_UTT:
+			if (goi->argc < 3) {
+				Jim_WrongNumArgs(goi->interp, 0, goi->argv, "-apple-utt ?ap-num? ?utt-base? ?width?");
+				return JIM_ERR;
+			}
 
-		case CFG_MEM_AP_NUM:
 			e = Jim_GetOpt_Wide(goi, &w);
 			if (e != JIM_OK)
 				return e;
 			if (w < 0 || w > DP_APSEL_MAX) {
-				Jim_SetResultString(goi->interp, "-mem-ap-num is invalid", -1);
+				Jim_SetResultString(goi->interp, "ap-num is invalid", -1);
 				return JIM_ERR;
 			}
-			pc->mem_ap_num = (uint32_t)w;
+			pc->utt_config.ap_num = (uint32_t)w;
+
+			e = Jim_GetOpt_Wide(goi, &w);
+			if (e != JIM_OK)
+				return e;
+			pc->utt_config.base = (uint64_t)w;
+
+			e = Jim_GetOpt_Wide(goi, &w);
+			if (e != JIM_OK)
+				return e;
+			pc->utt_config.width = (uint32_t)w;
+
+			pc->utt_config.valid = true;
 			break;
 
 		default:

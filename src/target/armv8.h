@@ -201,8 +201,10 @@ struct armv8_common {
 	uint64_t debug_base;
 	struct adiv5_ap *debug_ap;
 
+	/* Apple UTT */
 	uint64_t utt_base;
-	struct adiv5_ap *mem_ap;
+	struct adiv5_ap *utt_ap;
+	uint32_t utt_width;
 
 	const uint32_t *opcodes;
 
