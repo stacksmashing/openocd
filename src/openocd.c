@@ -46,6 +46,8 @@
 #include <strings.h>
 #endif
 
+int dirty_yolo_hack_register_commands(struct command_context *ctx);
+
 #ifdef PKGBLDDATE
 #define OPENOCD_VERSION	\
 	"Open On-Chip Debugger " VERSION RELSTR " (" PKGBLDDATE ")"
@@ -255,6 +257,7 @@ struct command_context *setup_command_handler(Jim_Interp *interp)
 		&pld_register_commands,
 		&cti_register_commands,
 		&dap_register_commands,
+		&dirty_yolo_hack_register_commands,
 		NULL
 	};
 	for (unsigned i = 0; NULL != command_registrants[i]; i++) {

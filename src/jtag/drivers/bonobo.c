@@ -783,3 +783,165 @@ struct jtag_interface bonobo_interface = {
 	.khz = bonobo_khz,
 	.execute_queue = bonobo_execute_queue,
 };
+
+/* ========== don't read past this line for your own sake ========== */
+
+static int jim_dirty_yolo_hack_command(Jim_Interp *interp, int argc, Jim_Obj * const *argv)
+{
+	int retval = JIM_ERR;
+	int r;
+	uint32_t trash;
+	uint32_t pidr[4];
+
+	if (argc > 1)
+		goto out;
+
+	if (bonobo_initialize() != ERROR_OK)
+		goto out;
+
+	r = bonobo_swd_switch_seq(JTAG_TO_SWD);
+	if (r != ERROR_OK) {
+		LOG_ERROR("dirty_yolo_hack: bonobo_swd_switch_seq failed: %d", r);
+		goto out;
+	}
+
+	bonobo_swd_write_reg(swd_cmd(false, false, DP_ABORT), STKCMPCLR | STKERRCLR | WDERRCLR | ORUNERRCLR, 0);
+	bonobo_swd_write_reg(swd_cmd(false, false, DP_CTRL_STAT), CDBGPWRUPREQ | CSYSPWRUPREQ | CORUNDETECT, 0);
+	bonobo_swd_write_reg(swd_cmd(false, false, DP_SELECT), 0x1000000, 0); // APBANK 0
+	// All bank 0
+	bonobo_swd_write_reg(swd_cmd(false, true, MEM_AP_REG_CSW), 0x80000052, 0); // AddrInc single, access size = 32
+	bonobo_swd_write_reg(swd_cmd(false, true, MEM_AP_REG_TAR), 0x80000fe0, 0); // ROMTABLE PIDR0
+	bonobo_swd_read_reg(swd_cmd(true, true, MEM_AP_REG_DRW), &trash, 0);
+	bonobo_swd_read_reg(swd_cmd(true, true, MEM_AP_REG_DRW), &pidr[0], 0);
+	bonobo_swd_read_reg(swd_cmd(true, true, MEM_AP_REG_DRW), &pidr[1], 0);
+	bonobo_swd_read_reg(swd_cmd(true, true, MEM_AP_REG_DRW), &pidr[2], 0);
+	bonobo_swd_read_reg(swd_cmd(true, true, DP_RDBUFF), &pidr[3], 0);
+
+	r = bonobo_swd_run();
+	if (r != ERROR_OK) {
+		LOG_ERROR("dirty_yolo_hack: bonobo_swd_run failed: %d", r);
+		goto out;
+	}
+
+/*	struct jtag_libusb_device_handle *usb_handle = NULL;
+	const uint16_t vids[] = { VID, 0 };
+	const uint16_t pids[] = { PID, 0 };
+	if (jtag_libusb_open(vids, pids, NULL, &usb_handle) != ERROR_OK) {
+		LOG_ERROR("Failed to open or find Bonobo");
+		goto out;
+	}
+	if (jtag_libusb_claim_interface(usb_handle, 0) != ERROR_OK) {
+		LOG_ERROR("Failed to claim Bonobo (bulk transfer) interface");
+		goto out;
+	}
+
+#define ACKMASK(x) ((((x) & 1) << 2) | ((x) & 2) | (((x) & 4) >> 2))
+	uint8_t buf[8];
+	uint8_t ack;
+	buf[0] = CMD_SWD_FREQ;
+	buf[1] = 6; // T High
+	buf[2] = 25; // T Low
+	if (jtag_libusb_bulk_write(usb_handle, BULK_EP_OUT, (char*)buf, 3, BULK_EP_TIMEOUT) <= 0) {
+		LOG_ERROR("Bulk write failed (1)");
+		goto out;
+	}
+
+	buf[0] = CMD_MUX_SEL;
+	buf[1] = MUX_MODE_ACCRESET;
+	if (jtag_libusb_bulk_write(usb_handle, BULK_EP_OUT, (char*)buf, 2, BULK_EP_TIMEOUT) <= 0) {
+		LOG_ERROR("Bulk write failed (2)");
+		goto out;
+	}
+
+	buf[0] = CMD_SDQ_SEL;
+	buf[1] = SDQ_MODE_SWD;
+	if (jtag_libusb_bulk_write(usb_handle, BULK_EP_OUT, (char*)buf, 2, BULK_EP_TIMEOUT) <= 0) {
+		LOG_ERROR("Bulk write failed (3)");
+		goto out;
+	}
+
+	buf[0] = CMD_MUX_SEL;
+	buf[1] = MUX_MODE_SDQ;
+	if (jtag_libusb_bulk_write(usb_handle, BULK_EP_OUT, (char*)buf, 2, BULK_EP_TIMEOUT) <= 0) {
+		LOG_ERROR("Bulk write failed (4)");
+		goto out;
+	}
+
+	buf[0] = CMD_SDQ_RESULT;
+	if (jtag_libusb_bulk_write(usb_handle, BULK_EP_OUT, (char*)buf, 1, BULK_EP_TIMEOUT) <= 0) {
+		LOG_ERROR("Bulk write failed (5)");
+		goto out;
+	}
+
+	if (jtag_libusb_bulk_read(usb_handle, BULK_EP_IN, (char*)buf, 1, BULK_EP_TIMEOUT) <= 0) {
+		LOG_ERROR("Bulk read failed (6)");
+		goto out;
+	}
+	if (!(buf[0] & SDQ_STATUS_DONE)) {
+		LOG_ERROR("No SDQ, phone not plugged/powered?");
+		goto out;
+	}
+
+	buf[0] = CMD_MUX_SEL;
+	buf[1] = MUX_MODE_SWD;
+	if (jtag_libusb_bulk_write(usb_handle, BULK_EP_OUT, (char*)buf, 2, BULK_EP_TIMEOUT) <= 0) {
+		LOG_ERROR("Bulk write failed (7)");
+		goto out;
+	}
+
+	buf[0] = CMD_SWD_EXEC;
+	buf[1] = swd_cmd(false, false, 0x8) | SWD_CMD_START | SWD_CMD_PARK;
+	buf[2] = 0x0;
+	buf[3] = 0x0;
+	buf[4] = 0x0;
+	buf[5] = 0x1; // AP1
+	if (jtag_libusb_bulk_write(usb_handle, BULK_EP_OUT, (char*)buf, 6, BULK_EP_TIMEOUT) <= 0) {
+		LOG_ERROR("Bulk write failed (8)");
+		goto out;
+	}
+	if (jtag_libusb_bulk_read(usb_handle, BULK_EP_IN, (char*)buf, 1, BULK_EP_TIMEOUT) <= 0) {
+		LOG_ERROR("Bulk read failed (9)");
+		goto out;
+	}
+	ack = ACKMASK(buf[0]);
+	if (ack != SWD_ACK_OK) {
+		LOG_ERROR("SWD ack not OK: %s", (ack == SWD_ACK_WAIT) ? "WAIT" : (ack == SWD_ACK_FAULT) ? "FAULT" : "JUNK");
+		goto out;
+	}
+
+	Jim_Obj *const *elements
+
+	//Jim_SetResult(interp, Jim_NewStringObj(interp, version_str, -1));
+	Jim_SetResult(interp, Jim_NewListObj(interp, version_str, -1));*/
+
+	Jim_Obj *list = Jim_NewListObj(interp, NULL, 0);
+	Jim_ListAppendElement(interp, list, Jim_NewIntObj(interp, pidr[0]));
+	Jim_ListAppendElement(interp, list, Jim_NewIntObj(interp, pidr[1]));
+	Jim_ListAppendElement(interp, list, Jim_NewIntObj(interp, pidr[2]));
+	Jim_ListAppendElement(interp, list, Jim_NewIntObj(interp, pidr[3]));
+	Jim_SetResult(interp, list);
+
+	retval = JIM_OK;
+out:
+	/*if (usb_handle)
+		jtag_libusb_close(usb_handle);*/
+	bonobo_quit();
+
+	return retval;
+}
+
+static const struct command_registration dirty_yolo_hack_command_handlers[] =
+{
+	{
+		.name = "dirty_yolo_hack",
+		.jim_handler = jim_dirty_yolo_hack_command,
+		.mode = COMMAND_CONFIG,
+		.help = "run while you still can",
+	},
+	COMMAND_REGISTRATION_DONE
+};
+
+int dirty_yolo_hack_register_commands(struct command_context *ctx)
+{
+	return register_commands(ctx, NULL, dirty_yolo_hack_command_handlers);
+}
