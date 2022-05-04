@@ -304,11 +304,15 @@ int mem_ap_write_u32(struct adiv5_ap *ap, uint64_t address,
 	/* Use banked addressing (REG_BDx) to avoid some link traffic
 	 * (updating TAR) when writing several consecutive addresses.
 	 */
+	LOG_DEBUG("Setup transfer");
 	retval = mem_ap_setup_transfer(ap,
 			CSW_32BIT | (ap->csw_value & CSW_ADDRINC_MASK),
 			address & 0xFFFFFFFFFFFFFFF0ULL);
-	if (retval != ERROR_OK)
+	if (retval != ERROR_OK) {
+		LOG_DEBUG("Failed to setup transfer");
 		return retval;
+	}
+		
 
 	return dap_queue_ap_write(ap, MEM_AP_REG_BD0 | (address & 0xC),
 			value);
