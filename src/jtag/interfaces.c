@@ -126,6 +126,9 @@ extern struct jtag_interface bcm2835gpio_interface;
 #if BUILD_PICOPROBE == 1
 extern struct jtag_interface picoprobe_adapter_driver;
 #endif
+#if BUILD_TAMARIN == 1
+extern struct jtag_interface tamarin_adapter_driver;
+#endif
 #if BUILD_CMSIS_DAP == 1
 extern struct jtag_interface cmsis_dap_interface;
 #endif
@@ -236,6 +239,9 @@ struct jtag_interface *jtag_interfaces[] = {
 #endif
 #if BUILD_PICOPROBE == 1
                &picoprobe_adapter_driver,
+#endif
+#if BUILD_TAMARIN == 1
+		&tamarin_adapter_driver,
 #endif
 #if BUILD_CMSIS_DAP == 1
 		&cmsis_dap_interface,

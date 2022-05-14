@@ -163,6 +163,9 @@ endif
 if PICOPROBE
 DRIVERFILES += %D%/picoprobe.c
 endif
+if TAMARIN
+DRIVERFILES += %D%/tamarin.c
+endif
 if XDS110
 DRIVERFILES += %D%/xds110.c
 endif
