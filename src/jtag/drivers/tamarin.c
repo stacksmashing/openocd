@@ -77,7 +77,7 @@ struct tamarin_cmd_hdr_enc {
 #define TAMARIN_QUEUE_SIZE 64
 
 
-#define VID 0x2E8A /* Raspberry Pi */
+#define VID 0x2B3E /* Raspberry Pi */
 #define PID 0x0004 /* Picoprobe */
 
 #define BULK_EP_OUT 4
